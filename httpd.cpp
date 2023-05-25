@@ -3,6 +3,8 @@
 #include<WinSock2.h>
 #pragma comment(lib, "WS2_32.lib")
 
+#define PRINTF(str)  printf("[%s - %d]"#str"-%s", __func__, __LINE__, str);
+
 void error_die(const char* str) {
     perror(str);
     exit(1);
@@ -65,14 +67,51 @@ int startup(unsigned short *port) {
     return server_socket;
 }
 
+//读取从指定的客户端套接字，读取一行数据，保存到buff中
+//返回实际读取到的字节数
+int get_line(int sock, char* buff, int size) {
+    char c = 0; //'\0'
+    int i = 0;
+
+    // \r\n
+    while (i<size-1 && c != '\n') {
+        int n = recv(sock, &c, 1, 0);
+        if (n > 0) {
+            //处理不是\n的情况
+            if (c == '\r') {
+                n = recv(sock, &c, 1, MSG_PEEK); // 检查一下字符，并不从网络包里面取出来
+                if (n > 0 && c == '\n') {
+                    recv(sock, &c, 1, 0);
+                }
+                else {
+                    c = '\n';
+                }
+            }
+            buff[i++] = c;
+        }
+        else {
+            c = '\n';
+        }
+    }
+    buff[i] = 0; //'\0'
+    return 0;
+}
+
 //处理用户请求的线程函数
 DWORD WINAPI accept_request(LPVOID arg) {
+    char buff[1024]; //1K
+    int client = (SOCKET)arg; //客户端套接字
+    
+    //读取一行数据
+    int numchars = get_line(client, buff, sizeof(buff));
+    PRINTF(buff); // [accept_request-53]buff="GET ...."
+
     return 0;
 }
 
 int main(void) {
     //0-65535
-    unsigned short port = 0;
+    unsigned short port = 8095;
     int server_socket = startup(&port);
     printf("httpd server is started, listening port: %d...", port);
     
@@ -98,6 +137,9 @@ int main(void) {
             0, &threadId);
 
     }
+
+    // "/"网站服务器资源下的index.html
+
     closesocket(server_socket);
     return 0;
 }
