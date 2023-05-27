@@ -3,7 +3,7 @@
 #include<WinSock2.h>
 #pragma comment(lib, "WS2_32.lib")
 
-#define PRINTF(str)  printf("[%s - %d]"#str"-%s", __func__, __LINE__, str);
+#define PRINTF(str)  printf("[%s - %d]"#str"=%s", __func__, __LINE__, str);
 
 void error_die(const char* str) {
     perror(str);
@@ -97,14 +97,50 @@ int get_line(int sock, char* buff, int size) {
     return 0;
 }
 
+void unimplement(int client) {
+    //向指定的套接字，发送一个提示，还没有实现的错误页面
+}
+
 //处理用户请求的线程函数
 DWORD WINAPI accept_request(LPVOID arg) {
     char buff[1024]; //1K
     int client = (SOCKET)arg; //客户端套接字
     
     //读取一行数据
+    // 0x015ffad8 "GET / HTTP/1.1\n"
     int numchars = get_line(client, buff, sizeof(buff));
     PRINTF(buff); // [accept_request-53]buff="GET ...."
+
+    char method[255];
+    int j = 0, i = 0;
+    while (!isspace(buff[j]) && i < sizeof(method) - 1) {
+        method[i++] = buff[j++];
+    }
+    method[i] = 0; // '\0'
+    PRINTF(method);
+
+    //检查请求的方法，本服务器是否支持
+    if (stricmp(method, "GET") && stricmp(method, "POST")) {
+        //向浏览器返回错误提示页面
+        unimplement(client);
+        return 0; // 线程停止服务
+    }
+
+    //解析资源文件路径
+    //www.ryuom.com/abc/text.html
+    // GET /abc/test.html HTTP/1.1\n
+    char url[255]; //存放请求的资源的完整路径
+    i = 0; 
+    while (isspace(buff[j]) && j < sizeof(buff)) {
+        j++;
+    }
+
+    while (!isspace(buff[j]) && i < sizeof(url) - 1 && j < sizeof(buff)) {
+        url[i++] = buff[j++];
+    }
+    url[i] = 0;
+    PRINTF(url)
+
 
     return 0;
 }
