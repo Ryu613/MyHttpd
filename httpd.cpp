@@ -1,4 +1,8 @@
 #include<stdio.h>
+
+#include<sys/types.h>
+#include<sys/stat.h>
+
 //网络通信需要包含的头文件（windows）
 #include<WinSock2.h>
 #pragma comment(lib, "WS2_32.lib")
@@ -101,6 +105,45 @@ void unimplement(int client) {
     //向指定的套接字，发送一个提示，还没有实现的错误页面
 }
 
+void not_found(int client) {
+    //todo
+}
+
+void headers(int client) {
+    //发送响应包的头信息
+}
+
+void cat(int client, FILE* resource) {
+    //todo
+}
+
+void server_file(int client, const char* fileName) {
+    char numchars;
+    char buff[1024];
+
+    //把请求数据包的剩余数据行，读完
+    while (numchars > 0 && strcmp(buff, "\n")) {
+        numchars = get_line(client, buff, sizeof(buff));
+        PRINTF(buff);
+    }
+
+    FILE* resource = fopen(fileName, "r");
+    if (resource == NULL) {
+        not_found(client);
+    }
+    else {
+        //正式发送资源给浏览器
+        headers(client);
+
+        //发送请求的资源信息
+        cat(client, resource);
+
+        printf("文件资源发送完毕!\n");
+    }
+
+    fclose(resource);
+}
+
 //处理用户请求的线程函数
 DWORD WINAPI accept_request(LPVOID arg) {
     char buff[1024]; //1K
@@ -139,9 +182,32 @@ DWORD WINAPI accept_request(LPVOID arg) {
         url[i++] = buff[j++];
     }
     url[i] = 0;
-    PRINTF(url)
+    PRINTF(url);
+    // www.ryuom.com
+    // 127.0.0.1
+    char path[512] = "";
+    sprintf(path, "htdocs%s", url);
+    if (path[strlen(path) - 1] == '/') {
+        strcat(path, "index.html");
+    }
+    PRINTF(path);
 
+    struct stat status;
+    if (stat(path, &status) == -1) {
+        // 请求包的剩余数据读取完毕
+        while (numchars > 0 && strcmp(buff, "\n")) {
+            numchars = get_line(client, buff, sizeof(buff));
+        }
+        not_found(client);
+    } else {
+        if ((status.st_mode & S_IFMT) == S_IFDIR) {
+            strcat(path, "/index.html");
+        }
 
+        server_file(client, path);
+    }
+
+    closesocket(client);
     return 0;
 }
 
